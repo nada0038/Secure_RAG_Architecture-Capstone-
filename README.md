@@ -222,58 +222,45 @@ flowchart TD
         API[API Layer]
         Auth[Verify Authentication]
         RBAC[Enforce RBAC]
-        Tenant[Extract tenant_id and chatbot_id]
-        DBContext[Set DB Tenant Context]
+        Tenant[Extract tenant_id]
+        Context[Set DB Tenant Context]
 
-        API --> Auth --> RBAC --> Tenant --> DBContext
+        API --> Auth --> RBAC --> Tenant --> Context
     end
 
-    subgraph Central_Policy
-        Policy[Centralized Policy Engine]
-    end
-
-    subgraph Pre_Generation_Safety
-        PreSafety[Safety Engine Pre Generation]
+    subgraph Pre_Generation
+        PreSafety[Safety Engine - Pre Generation]
+        PreChecks[Sanitize Input and Filter Prompts]
+        PreSafety --> PreChecks
     end
 
     subgraph RAG_Service
         Retriever[Tenant Scoped Retrieval]
-        Limits[Top K and Chunk Size Limits]
+        Limits[Top K and Chunk Limits]
         Retriever --> Limits
     end
 
-    subgraph Database
-        DB[PostgreSQL Database]
-        RLS[Row Level Security Enforced]
-        DB --> RLS
+    subgraph Central_Policy
+        Policy[Centralized Policy - Input and Output Validation]
     end
 
     subgraph LLM_Block
         LLM[LLM]
     end
 
-    subgraph Post_Generation_Safety
-        PostSafety[Safety Engine Post Generation]
+    subgraph Post_Generation
+        PostSafety[Safety Engine - Post Generation]
+        OutputChecks[Audit Response and Detect Sensitive Data]
+        PostSafety --> OutputChecks
     end
 
-    subgraph Audit
-        Logs[Audit Logs]
-        Metrics[Metrics and Monitoring]
-    end
-
-    DBContext --> Policy
+    Context --> Policy
     Policy --> PreSafety
-    PreSafety --> Retriever
-    Retriever --> DB
+    PreChecks --> Retriever
     Limits --> LLM
     LLM --> PostSafety
     PostSafety --> API
     API --> Client
-
-    API --> Logs
-    PreSafety --> Logs
-    PostSafety --> Logs
-    API --> Metrics
 ```
 
 ---
