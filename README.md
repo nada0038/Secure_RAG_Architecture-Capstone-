@@ -214,25 +214,85 @@ If tenant isolation, token validation, or retrieval filtering are not consistent
 ## Mermaid Architecture Diagram
 
 ```mermaid
-flowchart TD
-    A[Client]
-    B[API Layer - Auth and Tenant Extraction]
-    C[Pre-Generation Safety Engine]
-    D[RAG Service - Tenant Scoped Retrieval]
-    E[LLM]
-    F[Post-Generation Safety Engine]
-    G[Response to Client]
-    H[(PostgreSQL Database - RLS Enabled)]
+flowchart LR
+  %% =========================
+  %% Secure RAG Architecture — Tenant-Aware & Safety Validated
+  %% =========================
 
-    A --> B
-    B --> C
-    C --> D
-    D --> E
-    E --> F
-    F --> G
+  C[Client] --> API
 
-    B -->|Set Tenant Context| H
-    D -->|Tenant Filtered Query| H
+  subgraph API["API Layer"]
+    API[API Gateway / Backend]
+    A1[AuthN (JWT/OAuth)]
+    A2[RBAC / ABAC]
+    A3[Extract tenant_id + chatbot_id]
+    A4[Set DB tenant context (session)]
+    API --> A1 --> A2 --> A3 --> A4
+  end
+
+  %% Central policy control
+  subgraph POL["Centralized Policy"]
+    P[Policy Engine (rules + config)]
+  end
+
+  %% Pre-generation safety
+  subgraph PRE["Input Safety"]
+    S1[Safety Engine (pre-gen)\n- prompt injection checks\n- PII / secrets detection\n- allow/deny rules]
+  end
+
+  %% Retrieval
+  subgraph RAG["RAG Service"]
+    R1[Retriever\n- tenant-scoped filter\n- chatbot-scoped filter\n- top-K / chunk limits]
+    R2[Context Builder\n- sanitize + rank\n- citations/metadata]
+  end
+
+  %% Data store (tenant isolated)
+  subgraph DB["Data Layer"]
+    L[(🔒 PostgreSQL)]
+    L1[RLS Enforced\nWHERE tenant_id = current_setting('app.tenant_id')]
+    L2[Documents / Embeddings / Metadata]
+    L --> L1 --> L2
+  end
+
+  %% LLM
+  subgraph GEN["Generation"]
+    LLM[LLM]
+  end
+
+  %% Post-generation safety
+  subgraph POST["Output Safety"]
+    S2[Safety Engine (post-gen)\n- PII / secrets redaction\n- policy compliance\n- hallucination/unsafe content checks]
+  end
+
+  %% Audit / Monitoring
+  subgraph AUD["Observability & Audit"]
+    A[(🔒 Audit Logs / SIEM)]
+    M[Metrics + Traces]
+  end
+
+  %% Flows
+  A4 --> P
+  P --> S1
+  S1 --> R1
+
+  R1 --> L
+  L2 --> R1
+  R1 --> R2 --> LLM
+
+  %% Policy can influence retrieval + output rules
+  P -. "retrieval limits / allow-lists" .-> R1
+  P -. "output rules" .-> S2
+
+  LLM --> S2 --> API --> C
+
+  %% Auditing (tap points)
+  API -. "request/decision logs" .-> A
+  S1  -. "input risk score" .-> A
+  R1  -. "retrieval audit" .-> A
+  S2  -. "output redaction / flags" .-> A
+  API -. "latency / errors" .-> M
+  RAG -. "retrieval metrics" .-> M
+  GEN -. "token usage" .-> M
 ```
 
 ---
