@@ -1,5 +1,8 @@
 # Secure RAG Architecture (Tenant-Aware & Safety Validated)
 
+### Architecture Diagram
+https://github.com/nada0038/Secure_RAG_Architecture-Capstone-/blob/main/images/Image.jpg
+
 ## Overview
 
 This project implements a secure, multi-tenant Retrieval-Augmented Generation (RAG) architecture. The system is designed to ensure strict tenant isolation, secure backend enforcement, and layered safety validation before and after LLM generation.
