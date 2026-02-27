@@ -214,85 +214,66 @@ If tenant isolation, token validation, or retrieval filtering are not consistent
 ## Mermaid Architecture Diagram
 
 ```mermaid
-flowchart LR
-  %% =========================
-  %% Secure RAG Architecture — Tenant-Aware & Safety Validated
-  %% =========================
+flowchart TD
 
-  C[Client] --> API
+    Client --> API
 
-  subgraph API["API Layer"]
-    API[API Gateway / Backend]
-    A1[AuthN (JWT/OAuth)]
-    A2[RBAC / ABAC]
-    A3[Extract tenant_id + chatbot_id]
-    A4[Set DB tenant context (session)]
-    API --> A1 --> A2 --> A3 --> A4
-  end
+    subgraph API_Layer
+        API[API Layer]
+        Auth[Verify Authentication]
+        RBAC[Enforce RBAC]
+        Tenant[Extract tenant_id and chatbot_id]
+        DBContext[Set DB Tenant Context]
 
-  %% Central policy control
-  subgraph POL["Centralized Policy"]
-    P[Policy Engine (rules + config)]
-  end
+        API --> Auth --> RBAC --> Tenant --> DBContext
+    end
 
-  %% Pre-generation safety
-  subgraph PRE["Input Safety"]
-    S1[Safety Engine (pre-gen)\n- prompt injection checks\n- PII / secrets detection\n- allow/deny rules]
-  end
+    subgraph Central_Policy
+        Policy[Centralized Policy Engine]
+    end
 
-  %% Retrieval
-  subgraph RAG["RAG Service"]
-    R1[Retriever\n- tenant-scoped filter\n- chatbot-scoped filter\n- top-K / chunk limits]
-    R2[Context Builder\n- sanitize + rank\n- citations/metadata]
-  end
+    subgraph Pre_Generation_Safety
+        PreSafety[Safety Engine Pre Generation]
+    end
 
-  %% Data store (tenant isolated)
-  subgraph DB["Data Layer"]
-    L[(🔒 PostgreSQL)]
-    L1[RLS Enforced\nWHERE tenant_id = current_setting('app.tenant_id')]
-    L2[Documents / Embeddings / Metadata]
-    L --> L1 --> L2
-  end
+    subgraph RAG_Service
+        Retriever[Tenant Scoped Retrieval]
+        Limits[Top K and Chunk Size Limits]
+        Retriever --> Limits
+    end
 
-  %% LLM
-  subgraph GEN["Generation"]
-    LLM[LLM]
-  end
+    subgraph Database
+        DB[PostgreSQL Database]
+        RLS[Row Level Security Enforced]
+        DB --> RLS
+    end
 
-  %% Post-generation safety
-  subgraph POST["Output Safety"]
-    S2[Safety Engine (post-gen)\n- PII / secrets redaction\n- policy compliance\n- hallucination/unsafe content checks]
-  end
+    subgraph LLM_Block
+        LLM[LLM]
+    end
 
-  %% Audit / Monitoring
-  subgraph AUD["Observability & Audit"]
-    A[(🔒 Audit Logs / SIEM)]
-    M[Metrics + Traces]
-  end
+    subgraph Post_Generation_Safety
+        PostSafety[Safety Engine Post Generation]
+    end
 
-  %% Flows
-  A4 --> P
-  P --> S1
-  S1 --> R1
+    subgraph Audit
+        Logs[Audit Logs]
+        Metrics[Metrics and Monitoring]
+    end
 
-  R1 --> L
-  L2 --> R1
-  R1 --> R2 --> LLM
+    DBContext --> Policy
+    Policy --> PreSafety
+    PreSafety --> Retriever
+    Retriever --> DB
+    Limits --> LLM
+    LLM --> PostSafety
+    PostSafety --> API
+    API --> Client
 
-  %% Policy can influence retrieval + output rules
-  P -. "retrieval limits / allow-lists" .-> R1
-  P -. "output rules" .-> S2
-
-  LLM --> S2 --> API --> C
-
-  %% Auditing (tap points)
-  API -. "request/decision logs" .-> A
-  S1  -. "input risk score" .-> A
-  R1  -. "retrieval audit" .-> A
-  S2  -. "output redaction / flags" .-> A
-  API -. "latency / errors" .-> M
-  RAG -. "retrieval metrics" .-> M
-  GEN -. "token usage" .-> M
+    API --> Logs
+    PreSafety --> Logs
+    PostSafety --> Logs
+    API --> Metrics
 ```
 
 ---
