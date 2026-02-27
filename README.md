@@ -216,12 +216,13 @@ If tenant isolation, token validation, or retrieval filtering are not consistent
 ```mermaid
 flowchart TD
     A[Client]
-    B[API Layer<br/>Verify Auth<br/>Extract tenant_id<br/>Enforce RBAC]
-    C[Safety Engine<br/>(Pre-Generation)]
-    D[RAG Service<br/>Filter by tenant_id + chatbot_id<br/>Limit Top-K]
+    B[API Layer - Auth and Tenant Extraction]
+    C[Pre-Generation Safety Engine]
+    D[RAG Service - Tenant Scoped Retrieval]
     E[LLM]
-    F[Safety Engine<br/>(Post-Generation)]
+    F[Post-Generation Safety Engine]
     G[Response to Client]
+    H[(PostgreSQL Database - RLS Enabled)]
 
     A --> B
     B --> C
@@ -230,8 +231,8 @@ flowchart TD
     E --> F
     F --> G
 
-    B -->|Set Tenant Context| H[(Database - RLS Enabled)]
-    D -->|Tenant-Scoped Retrieval| H
+    B -->|Set Tenant Context| H
+    D -->|Tenant Filtered Query| H
 ```
 
 ---
